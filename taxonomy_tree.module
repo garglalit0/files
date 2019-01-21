@@ -1,0 +1,113 @@
+<?php 
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\group\Entity\Group;
+use Drupal\Core\Url;
+use Drupal\Core\Form\FormState;
+use Drupal\node\Entity\Node;
+use Drupal\Core\Mail\MailManagerInterface;
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Database\Database;
+use Drupal\taxonomy\Entity\Term;	
+use Drupal\user\Entity\User;
+use Drupal\views\ViewExecutable;
+use Drupal\views\Plugin\views\query\QueryPluginBase;
+use Drupal\taxonomy_tree;
+
+function taxonomy_tree_page_attachments(array &$attachments) {
+	$attachments['#attached']['library'][] = 'taxonomy_tree/taxonomy_tree';
+}
+function taxonomy_tree_preprocess_html(&$variables) {
+	$attachments['#attached']['library'][] = 'taxonomy_tree/taxonomy_tree';
+	$site_base_url = Url::fromUri('internal:/')->setAbsolute()->toString();
+    $current_path = \Drupal::service('path.current')->getPath();
+    $result = \Drupal::service('path.alias_manager')->getAliasByPath($current_path);
+    $path_parts = explode('/', $result);  
+    if(isset($path_parts[1])){
+      if($path_parts[1] == 'group'){
+        if(isset($path_parts[2])){
+          if (is_numeric($path_parts[2]))
+          {
+            $groupId= $path_parts[2];
+          }
+        }
+      }
+    }
+	$variables['#attached']['drupalSettings']['jsGroupId']['gid']= $groupId;
+}
+
+function taxonomy_tree_preprocess_page(&$variables) {
+	$attachments['#attached']['library'][] = 'taxonomy_tree/taxonomy_tree';
+	$folderTree = '';
+	$site_base_url = Url::fromUri('internal:/')->setAbsolute()->toString();
+    $current_path = \Drupal::service('path.current')->getPath();
+    $result = \Drupal::service('path.alias_manager')->getAliasByPath($current_path);
+    $path_parts = explode('/', $result);  
+    if(isset($path_parts[1])){
+      if($path_parts[1] == 'group'){
+        if(isset($path_parts[2])){
+          if (is_numeric($path_parts[2]))
+          {
+            $groupId= $path_parts[2];
+          }
+        }
+      }
+    }
+	
+	$tt = \Drupal::service('taxonomy_tree.taxonomy_term_tree');  
+	$trr = $tt->load('file_folders'); 
+foreach ($trr as $trrkey => $trrvalue) {
+	//echo $trrkey;
+	$term = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->load($trrkey);
+	$file_folder_group_id = $term->get('field_file_group_id')->value;
+	if($file_folder_group_id != $groupId){
+		unset($trr[$trrkey]);
+	}
+	# code...
+}
+ 	foreach ($trr as $rootkey => $rootvalue) {
+ 		$root_folder_id = $rootvalue->tid;
+ 		$folderTree.='<ul class="folderparent">';
+ 		$folderTree.='<li class="folder active" data-name="'.$rootvalue->name.'" data-id="'.$rootvalue->tid.'" id="child'.$rootvalue->tid.'">';
+    $folderTree.='<span>';
+ 		$folderTree.= $rootvalue->name;
+    $folderTree.='</span>';
+    if(!empty($rootvalue->children))
+ 		{
+ 			$folderTree.='<ul class="child">';
+ 			$folderTree.= buildFileFolderTree($rootvalue->children);
+ 			$folderTree.='</ul>';
+ 		}
+ 		$folderTree.='</li>';
+		$folderTree.='</ul>';
+ 	}
+ 	$variables['folderTree'] = $folderTree;
+ 	$variables['group_id'] = $groupId;
+ 	$variables['root_folder_id'] =$root_folder_id;
+ 	$variables['#attached']['drupalSettings']['jsGroupRootFolderId']['fid']= $root_folder_id;
+
+	
+}
+
+function buildFileFolderTree($children=array())
+{
+	$childrentree = '';
+	foreach ($children as $childrenkey => $childrenvalue) {
+		$childrentree.='<li class="folder" data-name="'.$childrenvalue->name.'" data-id="'.$childrenvalue->tid.'" id="child'.$rootvalue->tid.'">';
+    $childrentree.='<span>';
+    $childrentree.=$childrenvalue->name;
+    $childrentree.='</span>';
+    if(!empty($childrenvalue->children))
+ 		{
+ 			$childrentree.='<ul class="subchild">';
+ 			$childrentree.= buildFileFolderTree($childrenvalue->children);
+ 			$childrentree.='</ul>';
+ 		}
+ 		$childrentree.='</li>';
+	}
+	return ($childrentree);
+}
+
+
+
+?>

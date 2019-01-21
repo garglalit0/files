@@ -1,0 +1,283 @@
+<?php
+
+/**
+ * @file
+ * Functions to support theming in the Wish theme.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Template\Attribute;
+
+/**
+ * Implements hook_preprocess_HOOK() for HTML document templates.
+ *
+ * Adds body classes if certain regions have content.
+ */
+function wish_preprocess_html(&$variables) {
+  // Add information about the number of sidebars.
+  if (!empty($variables['page']['sidebar_first']) && !empty($variables['page']['sidebar_second'])) {
+    $variables['attributes']['class'][] = 'layout-two-sidebars';
+  }
+  elseif (!empty($variables['page']['sidebar_first'])) {
+    $variables['attributes']['class'][] = 'layout-one-sidebar';
+    $variables['attributes']['class'][] = 'layout-sidebar-first';
+  }
+  elseif (!empty($variables['page']['sidebar_second'])) {
+    $variables['attributes']['class'][] = 'layout-one-sidebar';
+    $variables['attributes']['class'][] = 'layout-sidebar-second';
+  }
+  else {
+    $variables['attributes']['class'][] = 'layout-no-sidebars';
+  }
+
+  if (!empty($variables['page']['featured_top'])) {
+    $variables['attributes']['class'][] = 'has-featured-top';
+  }
+
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for page title templates.
+ */
+function wish_preprocess_page_title(&$variables) {
+  // Since the title and the shortcut link are both block level elements,
+  // positioning them next to each other is much simpler with a wrapper div.
+  if (!empty($variables['title_suffix']['add_or_remove_shortcut']) && $variables['title']) {
+    // Add a wrapper div using the title_prefix and title_suffix render
+    // elements.
+    $variables['title_prefix']['shortcut_wrapper'] = [
+      '#markup' => '<div class="shortcut-wrapper clearfix">',
+      '#weight' => 100,
+    ];
+    $variables['title_suffix']['shortcut_wrapper'] = [
+      '#markup' => '</div>',
+      '#weight' => -99,
+    ];
+    // Make sure the shortcut link is the first item in title_suffix.
+    $variables['title_suffix']['add_or_remove_shortcut']['#weight'] = -100;
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for maintenance-page.html.twig.
+ */
+function wish_preprocess_maintenance_page(&$variables) {
+  // By default, site_name is set to Drupal if no db connection is available
+  // or during site installation. Setting site_name to an empty string makes
+  // the site and update pages look cleaner.
+  // @see template_preprocess_maintenance_page
+  if (!$variables['db_is_active']) {
+    $variables['site_name'] = '';
+  }
+
+  // Wish has custom styling for the maintenance page.
+  $variables['#attached']['library'][] = 'wish/maintenance_page';
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for node.html.twig.
+ */
+function wish_preprocess_node(&$variables) {
+  // Remove the "Add new comment" link on teasers or when the comment form is
+  // displayed on the page.
+  if ($variables['teaser'] || !empty($variables['content']['comments']['comment_form'])) {
+    unset($variables['content']['links']['comment']['#links']['comment-add']);
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for block.html.twig.
+ */
+function wish_preprocess_block(&$variables) {
+  // Add a clearfix class to system branding blocks.
+  if ($variables['plugin_id'] == 'system_branding_block') {
+    $variables['attributes']['class'][] = 'clearfix';
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for menu.html.twig.
+ */
+function wish_preprocess_menu(&$variables) {
+  $variables['attributes']['class'][] = 'clearfix';
+}
+
+/**
+ * Implements hook_theme_suggestions_HOOK_alter() for form templates.
+ */
+function wish_theme_suggestions_form_alter(array &$suggestions, array $variables) {
+  if ($variables['element']['#form_id'] == 'search_block_form') {
+    $suggestions[] = 'form__search_block_form';
+  }
+}
+
+/**
+ * Implements hook_form_alter() to add classes to the search form.
+ */
+function wish_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  if (in_array($form_id, ['search_block_form', 'search_form'])) {
+    $key = ($form_id == 'search_block_form') ? 'actions' : 'basic';
+    if (!isset($form[$key]['submit']['#attributes'])) {
+      $form[$key]['submit']['#attributes'] = new Attribute();
+    }
+    $form[$key]['submit']['#attributes']->addClass('search-form__submit');
+  }
+}
+
+function wish_theme_suggestions_page_alter(array &$suggestions, array $variables) {
+  /**
+   * 404 template suggestion.
+   */
+  if (!is_null(Drupal::requestStack()->getCurrentRequest()->attributes->get('exception'))) {
+    $status_code = Drupal::requestStack()->getCurrentRequest()->attributes->get('exception')->getStatusCode();
+    switch ($status_code) {
+      case 404: {
+        $suggestions[] = 'page__' . (string) $status_code;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  // Checks for node pages.  Add page url Alias based template name
+  if ($node = \Drupal::routeMatch()->getParameter('node')) {
+    $current_path = \Drupal::service('path.current')->getPath();
+    $alias = \Drupal::service('path.alias_manager')->getAliasByPath($current_path);
+    $alias= ltrim($alias,"/");
+    $clean_alias = str_replace('-', '', $alias);
+    $suggestions[] = 'page__node__'.$clean_alias;
+  }
+  if ($node = \Drupal::routeMatch()->getParameter('node')) {
+    $content_type = $node->bundle();
+    $suggestions[] = 'page__'.$content_type;
+  }
+}
+function wish_theme_suggestions_views_view_alter(array &$suggestions, array $variables) {
+  // If you want you can add a template suggestion for all views
+  // based on their ID:
+  $suggestions[] = sprintf('views_view__%s', $variables['view']->id());
+  // Or you can check the ID, add suggestions, do whatever you want
+  // ...
+}
+
+/**
+* Implements hook_theme_suggestions_HOOK_alter() for node templates.
+*/
+function wish_theme_suggestions_node_alter(array &$suggestions, array $variables) {
+  /**
+   * 404 template suggestion.
+   */
+  if (!is_null(Drupal::requestStack()->getCurrentRequest()->attributes->get('exception'))) {
+    $status_code = Drupal::requestStack()->getCurrentRequest()->attributes->get('exception')->getStatusCode();
+    switch ($status_code) {
+      case 404: {
+        $suggestions[] = 'node__' . (string) $status_code;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+   if ($node = \Drupal::routeMatch()->getParameter('node')) {
+    $current_path = \Drupal::service('path.current')->getPath();
+    $alias = \Drupal::service('path.alias_manager')->getAliasByPath($current_path);
+    $alias= ltrim($alias,"/");
+    $clean_alias = str_replace('-', '', $alias);
+    $suggestions[] = 'node__'.$clean_alias;
+  }
+}
+function wish_preprocess_page(&$variables)
+{
+   $slider_type = [];
+  $nids = \Drupal::entityQuery('node')->condition('type','slider')->execute();
+  $slider_nodes =  \Drupal\node\Entity\Node::loadMultiple($nids);
+if(!empty( $slider_nodes )){
+      foreach($slider_nodes as $slider){
+           // start slider upload/link handling
+          $slider_title = $slider->getTitle(); // get the slider title      
+          $link = '';
+          $uri = $slider->get('field_slider_image')->entity->getFileUri(); // get slider image relative url
+          $link = file_create_url($uri); // get the image slider absolute url
+           // slider body description
+          $slider_body = $slider->get("body")->getValue();
+          $slider_dec = $slider_body[0]['value'];
+           //create array for twig
+           $slider_type[] = [
+                            'id' => $slider->id(),
+                            'title' => $slider_title,
+                            'description' => $slider_dec,
+                            'slider_image' =>$link
+
+                           ];
+      } // end foreach
+  }// end If
+  $variables['slider_data'] = $slider_type;
+
+  $our_work = [];
+  $work_nids = \Drupal::entityQuery('node')->condition('type','our_work')->execute();
+  $work_nodes =  \Drupal\node\Entity\Node::loadMultiple($work_nids);
+  if(!empty( $work_nodes )){
+      foreach($work_nodes as $work){
+           // start slider upload/link handling
+          $work_title = $work->getTitle(); // get the slider title      
+          $work_image_link = '';
+          $uri = $work->get('field_work_image')->entity->getFileUri(); // get slider image relative url
+          $work_image_link = file_create_url($uri); // get the image slider absolute url
+           // slider body description
+          $work_body = $work->get("body")->getValue();
+          $work_desc = $work_body[0]['value'];
+           //create array for twig
+           $our_work[] = [
+                            'work_id' => $work->id(),
+                            'work_title' => $work_title,
+                            'work_description' => $work_desc,
+                            'work_slider_image' =>$work_image_link
+
+                           ];
+      } // end foreach
+  }// end If
+  $variables['work_data'] = $our_work;
+
+ /* get the home page config page setting data value*/
+
+  $homePageSettings = \Drupal\config_pages\Entity\ConfigPages::config('home_page_settings');
+
+  $variables['our_goal_des'] = $homePageSettings->get('field_our_goal_description')->value;
+  $variables['our_goal_link_text'] = $homePageSettings->get('field_goal_section_link')->title;
+  $variables['our_goal_link_url'] = $homePageSettings->get('field_goal_section_link')->uri;
+  $variables['support_us_link_text'] = $homePageSettings->get('field_support_us_link')->title;
+  $variables['support_us_link_url'] = $homePageSettings->get('field_support_us_link')->uri;
+  // optional: add a cache dependency
+  $variables['#cache']['tags'][] = 'config_pages:' . $homePageSettings ->id();
+
+
+
+
+
+
+
+
+
+
+
+
+/*  $footerConfigPage = \Drupal\config_pages\Entity\ConfigPages::config('footer');
+  $variables['footer_update_section_1_text'] = $footerConfigPage->get('field_update_section1_text')->value;
+  $variables['footer_update_section_2_text'] = $footerConfigPage->get('field_update_section2_text')->value;
+  $variables['footer_update_section_3_text'] = $footerConfigPage->get('field_update_section3_text')->value;
+  $variables['footer_update_excerpt'] = $footerConfigPage->get('field_contact_exerpt')->value;
+  $variables['footer_update_address'] = $footerConfigPage->get('field_address')->value;
+  $variables['footer_update_email'] = $footerConfigPage->get('field_email_id')->value;
+  $variables['footer_update_facebook'] = $footerConfigPage->get('field_facebook')->uri;
+  $variables['footer_update_twitter'] = $footerConfigPage->get('field_twitter')->uri;
+  $variables['footer_update_copyright'] = $footerConfigPage->get('field_copyright')->value;
+
+  //kint($footerConfigPage);
+
+  // optional: add a cache dependency
+  $variables['#cache']['tags'][] = 'config_pages:' . $footerConfigPage ->id();*/
+
+
+
+
+}

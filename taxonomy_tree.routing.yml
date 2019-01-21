@@ -1,0 +1,6 @@
+taxonomy_tree.loadFileFolder:
+  path: '/filefolder-loading'
+  defaults:
+    _controller: 'Drupal\taxonomy_tree\Controller\FileFolderController::loadFileFolder'
+  requirements:
+    _permission: 'access content'

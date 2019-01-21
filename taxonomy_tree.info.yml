@@ -1,0 +1,5 @@
+name: Taxonomy Tree
+description: Utility for loading terms in a tree
+core: 8.x
+type: module
+datestamp: 1519763292
